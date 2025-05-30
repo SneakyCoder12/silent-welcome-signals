@@ -1,4 +1,3 @@
-
 // Financial data API service
 // Using CoinMarketCap, Twelve Data, Frankfurter, and Alpha Vantage APIs
 
@@ -125,6 +124,33 @@ export async function fetchCryptoData(symbol) {
     }
   } catch (error) {
     console.error('Crypto API failed:', error);
+    throw error;
+  }
+}
+
+// Get stock time series data using Twelve Data
+export async function fetchStockTimeSeries(symbol, interval = '1day', outputsize = 30) {
+  try {
+    const response = await fetch(`https://api.twelvedata.com/time_series?symbol=${symbol}&interval=${interval}&outputsize=${outputsize}&apikey=${TWELVE_DATA_API_KEY}`);
+    const data = await response.json();
+    
+    if (data.values && Array.isArray(data.values)) {
+      return {
+        symbol: data.meta.symbol,
+        values: data.values.map(item => ({
+          date: item.datetime,
+          open: parseFloat(item.open),
+          high: parseFloat(item.high),
+          low: parseFloat(item.low),
+          close: parseFloat(item.close),
+          volume: parseInt(item.volume) || 0
+        }))
+      };
+    } else {
+      throw new Error('No time series data found');
+    }
+  } catch (error) {
+    console.error('Failed to get time series data for', symbol, ':', error);
     throw error;
   }
 }
