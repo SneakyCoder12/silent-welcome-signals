@@ -1,19 +1,21 @@
 
 // Dashboard JavaScript - Handles all dashboard functionality with real API data
-// Uses CoinMarketCap for crypto, Twelve Data for stocks, and proper error handling
+// Uses Yahoo Finance for stocks/market data and CoinMarketCap for crypto data
 
 import { 
   getMarketIndices,
   getMajorStocks,
   getMajorCrypto,
-  getGlobalMarketStats
+  getGlobalMarketStats,
+  getTrendingStocks,
+  getMarketMovers
 } from './api.js';
 
 // Wait for the page to fully load before initializing dashboard
 document.addEventListener('DOMContentLoaded', async function() {
   console.log('Dashboard loading started...');
   
-  // Initialize all dashboard sections
+  // Initialize all dashboard sections with proper error handling
   await initializeMarketOverview();
   await initializeWatchlist();
   await initializeCryptoTracker();
@@ -58,7 +60,7 @@ function updateDateTime() {
   }
 }
 
-// Load and display market indices (SPY, QQQ, DIA, IWM)
+// Load and display market indices using Yahoo Finance (^GSPC, ^IXIC, ^DJI, ^RUT)
 async function initializeMarketOverview() {
   const marketOverviewElement = document.getElementById('market-overview');
   if (!marketOverviewElement) {
@@ -67,27 +69,27 @@ async function initializeMarketOverview() {
   }
   
   try {
-    console.log('Loading market indices data...');
-    marketOverviewElement.innerHTML = '<div class="col-span-full text-center text-gold-400">Loading market data...</div>';
+    console.log('Loading market indices data from Yahoo Finance...');
+    marketOverviewElement.innerHTML = '<div class="col-span-full text-center text-gold-400">Loading market data from Yahoo Finance...</div>';
     
-    // Fetch market indices data from Twelve Data API
+    // Fetch market indices data from Yahoo Finance API
     const marketIndices = await getMarketIndices();
-    console.log('Market indices loaded:', marketIndices);
+    console.log('Yahoo Finance market indices loaded:', marketIndices);
     
     if (!marketIndices || marketIndices.length === 0) {
-      throw new Error('No market indices data received');
+      throw new Error('No market indices data received from Yahoo Finance');
     }
     
     let marketOverviewHTML = '';
     marketIndices.forEach(index => {
       if (index && index.price) {
-        // Determine if the stock is up or down for styling
+        // Determine if the index is up or down for styling
         const changeClass = index.change >= 0 ? 'text-neon-green' : 'text-red-500';
         const changeIcon = index.change >= 0 ? 
           '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>' : 
           '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>';
         
-        // Build HTML for each market index
+        // Build HTML for each market index with Yahoo Finance data
         marketOverviewHTML += `
           <div class="glass glass-hover rounded-lg p-4">
             <div class="flex justify-between items-center">
@@ -109,14 +111,14 @@ async function initializeMarketOverview() {
     });
     
     marketOverviewElement.innerHTML = marketOverviewHTML;
-    console.log('Market overview updated successfully');
+    console.log('Market overview updated successfully with Yahoo Finance data');
   } catch (error) {
-    console.error('Error initializing market overview:', error);
-    marketOverviewElement.innerHTML = '<div class="col-span-full text-center text-red-500">Failed to load market data. Checking API connection...</div>';
+    console.error('Error initializing market overview with Yahoo Finance:', error);
+    marketOverviewElement.innerHTML = '<div class="col-span-full text-center text-red-500">Failed to load market data from Yahoo Finance. Checking API connection...</div>';
   }
 }
 
-// Load and display major tech stocks watchlist
+// Load and display major tech stocks watchlist using Yahoo Finance
 async function initializeWatchlist() {
   const watchlistElement = document.getElementById('watchlist');
   if (!watchlistElement) {
@@ -125,15 +127,15 @@ async function initializeWatchlist() {
   }
   
   try {
-    console.log('Loading major stocks data...');
-    watchlistElement.innerHTML = '<div class="col-span-full text-center text-gold-400">Loading stock data...</div>';
+    console.log('Loading major stocks data from Yahoo Finance...');
+    watchlistElement.innerHTML = '<div class="col-span-full text-center text-gold-400">Loading stock data from Yahoo Finance...</div>';
     
-    // Fetch major stocks from Twelve Data API
+    // Fetch major stocks from Yahoo Finance API
     const stocks = await getMajorStocks();
-    console.log('Stocks loaded:', stocks);
+    console.log('Yahoo Finance stocks loaded:', stocks);
     
     if (!stocks || stocks.length === 0) {
-      throw new Error('No stocks data received');
+      throw new Error('No stocks data received from Yahoo Finance');
     }
     
     let watchlistHTML = '';
@@ -145,7 +147,7 @@ async function initializeWatchlist() {
           '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>' : 
           '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>';
         
-        // Build HTML for each stock
+        // Build HTML for each stock with Yahoo Finance data
         watchlistHTML += `
           <div class="glass glass-hover rounded-lg p-4">
             <div class="flex justify-between items-center">
@@ -167,10 +169,10 @@ async function initializeWatchlist() {
     });
     
     watchlistElement.innerHTML = watchlistHTML;
-    console.log('Watchlist updated successfully');
+    console.log('Watchlist updated successfully with Yahoo Finance data');
   } catch (error) {
-    console.error('Error initializing watchlist:', error);
-    watchlistElement.innerHTML = '<div class="col-span-full text-center text-red-500">Failed to load stock data. Checking API connection...</div>';
+    console.error('Error initializing watchlist with Yahoo Finance:', error);
+    watchlistElement.innerHTML = '<div class="col-span-full text-center text-red-500">Failed to load stock data from Yahoo Finance. Checking API connection...</div>';
   }
 }
 
@@ -184,14 +186,14 @@ async function initializeCryptoTracker() {
   
   try {
     console.log('Loading cryptocurrency data from CoinMarketCap...');
-    cryptoTrackerElement.innerHTML = '<div class="col-span-full text-center text-gold-400">Loading crypto data...</div>';
+    cryptoTrackerElement.innerHTML = '<div class="col-span-full text-center text-gold-400">Loading crypto data from CoinMarketCap...</div>';
     
     // Fetch top cryptocurrencies from CoinMarketCap API
     const cryptos = await getMajorCrypto();
-    console.log('Cryptocurrencies loaded:', cryptos);
+    console.log('CoinMarketCap cryptocurrencies loaded:', cryptos);
     
     if (!cryptos || cryptos.length === 0) {
-      throw new Error('No cryptocurrency data received');
+      throw new Error('No cryptocurrency data received from CoinMarketCap');
     }
     
     let cryptoHTML = '';
@@ -201,7 +203,7 @@ async function initializeCryptoTracker() {
         const changeClass = crypto.change >= 0 ? 'text-neon-green' : 'text-red-500';
         const changeIcon = crypto.change >= 0 ? '▲' : '▼';
         
-        // Build HTML for each cryptocurrency
+        // Build HTML for each cryptocurrency with CoinMarketCap data
         cryptoHTML += `
           <div class="glass glass-hover rounded-lg p-4">
             <div class="flex justify-between items-center">
@@ -223,14 +225,14 @@ async function initializeCryptoTracker() {
     });
     
     cryptoTrackerElement.innerHTML = cryptoHTML;
-    console.log('Crypto tracker updated successfully');
+    console.log('Crypto tracker updated successfully with CoinMarketCap data');
   } catch (error) {
-    console.error('Error initializing crypto tracker:', error);
-    cryptoTrackerElement.innerHTML = '<div class="col-span-full text-center text-red-500">Failed to load crypto data. Checking CoinMarketCap API...</div>';
+    console.error('Error initializing crypto tracker with CoinMarketCap:', error);
+    cryptoTrackerElement.innerHTML = '<div class="col-span-full text-center text-red-500">Failed to load crypto data from CoinMarketCap. Checking API connection...</div>';
   }
 }
 
-// Load and display global cryptocurrency market statistics
+// Load and display global cryptocurrency market statistics using CoinMarketCap
 async function initializeGlobalStats() {
   const globalStatsElement = document.getElementById('global-stats');
   if (!globalStatsElement) {
@@ -239,20 +241,20 @@ async function initializeGlobalStats() {
   }
   
   try {
-    console.log('Loading global market statistics...');
+    console.log('Loading global market statistics from CoinMarketCap...');
     
     // Fetch global market data from CoinMarketCap
     const stats = await getGlobalMarketStats();
-    console.log('Global stats loaded:', stats);
+    console.log('CoinMarketCap global stats loaded:', stats);
     
     if (!stats) {
-      throw new Error('No global stats data received');
+      throw new Error('No global stats data received from CoinMarketCap');
     }
     
-    // Build HTML for global market statistics
+    // Build HTML for global market statistics with CoinMarketCap data
     const globalStatsHTML = `
       <div class="glass rounded-lg p-6">
-        <h3 class="text-lg font-semibold text-gold-400 mb-4">Global Market Stats</h3>
+        <h3 class="text-lg font-semibold text-gold-400 mb-4">Global Crypto Market Stats</h3>
         <div class="grid grid-cols-2 gap-4">
           <div>
             <p class="text-gray-400 text-sm">Total Market Cap</p>
@@ -275,10 +277,10 @@ async function initializeGlobalStats() {
     `;
     
     globalStatsElement.innerHTML = globalStatsHTML;
-    console.log('Global stats updated successfully');
+    console.log('Global stats updated successfully with CoinMarketCap data');
   } catch (error) {
-    console.error('Error loading global stats:', error);
-    globalStatsElement.innerHTML = '<div class="text-red-500">Failed to load global market stats. Checking API connection...</div>';
+    console.error('Error loading global stats from CoinMarketCap:', error);
+    globalStatsElement.innerHTML = '<div class="text-red-500">Failed to load global market stats from CoinMarketCap. Checking API connection...</div>';
   }
 }
 
@@ -287,7 +289,7 @@ async function refreshDashboardData() {
   try {
     console.log('Refreshing all dashboard data...');
     
-    // Refresh all sections
+    // Refresh all sections with Yahoo Finance and CoinMarketCap data
     await initializeMarketOverview();
     await initializeWatchlist();
     await initializeCryptoTracker();
