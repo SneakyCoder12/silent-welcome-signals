@@ -1,19 +1,9 @@
 
 // Financial data API service
-// Using Alpha Vantage for stock/currency data and News API for news
+// Using CoinMarketCap for crypto data, Frankfurter for currency, and Alpha Vantage for stocks
 
-const ALPHA_VANTAGE_API_KEY = 'Q1J2GM7L9WMRDS9A';
-const NEWS_API_KEY = '1cb3fb8e7cb64f9f8c7130008c22820c';
-
-// Backup currency rates in case API fails
-export const mockCurrencyData = {
-  'USD_EUR': { rate: 0.92 },
-  'EUR_USD': { rate: 1.09 },
-  'USD_GBP': { rate: 0.79 },
-  'GBP_USD': { rate: 1.27 },
-  'USD_JPY': { rate: 150.25 },
-  'JPY_USD': { rate: 0.0067 }
-};
+const CMC_API_KEY = '478085d0-7f9b-44bb-9b5e-f88abf9f5a3a';
+const ALPHA_VANTAGE_API_KEY = 'RGHLGIFYBZMTCTFF';
 
 // Get stock quote data
 export async function fetchStockData(symbol) {
@@ -40,20 +30,18 @@ export async function fetchStockData(symbol) {
   }
 }
 
-// Get currency exchange rate
+// Get currency exchange rate using Frankfurter API
 export async function fetchExchangeRate(fromCurrency, toCurrency) {
   try {
-    const response = await fetch(`https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=${fromCurrency}&to_currency=${toCurrency}&apikey=${ALPHA_VANTAGE_API_KEY}`);
+    const response = await fetch(`https://api.frankfurter.app/latest?from=${fromCurrency}&to=${toCurrency}`);
     const data = await response.json();
     
-    if (data['Realtime Currency Exchange Rate']) {
+    if (data.rates && data.rates[toCurrency]) {
       return {
-        rate: parseFloat(data['Realtime Currency Exchange Rate']['5. Exchange Rate']),
-        lastRefreshed: data['Realtime Currency Exchange Rate']['6. Last Refreshed'],
-        fromCurrencyCode: data['Realtime Currency Exchange Rate']['1. From_Currency Code'],
-        fromCurrencyName: data['Realtime Currency Exchange Rate']['2. From_Currency Name'],
-        toCurrencyCode: data['Realtime Currency Exchange Rate']['3. To_Currency Code'],
-        toCurrencyName: data['Realtime Currency Exchange Rate']['4. To_Currency Name']
+        rate: data.rates[toCurrency],
+        lastRefreshed: data.date,
+        fromCurrencyCode: fromCurrency,
+        toCurrencyCode: toCurrency
       };
     } else {
       throw new Error('Exchange rate not found');
@@ -64,23 +52,26 @@ export async function fetchExchangeRate(fromCurrency, toCurrency) {
   }
 }
 
-// Get crypto data (Bitcoin, Ethereum, etc.)
-export async function fetchCryptoData(symbol, market = 'USD') {
+// Get crypto data from CoinMarketCap
+export async function fetchCryptoData(symbol) {
   try {
-    const response = await fetch(`https://www.alphavantage.co/query?function=DIGITAL_CURRENCY_INTRADAY&symbol=${symbol}&market=${market}&apikey=${ALPHA_VANTAGE_API_KEY}`);
+    const response = await fetch(`https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=${symbol}`, {
+      headers: {
+        'X-CMC_PRO_API_KEY': CMC_API_KEY,
+        'Accept': 'application/json'
+      }
+    });
     const data = await response.json();
     
-    if (data['Time Series (Digital Currency Intraday)']) {
-      const timeSeries = data['Time Series (Digital Currency Intraday)'];
-      const latestTime = Object.keys(timeSeries)[0];
-      const latestData = timeSeries[latestTime];
-      
+    if (data.data && data.data[symbol]) {
+      const crypto = data.data[symbol];
       return {
-        symbol: symbol,
-        name: data['Meta Data']['3. Digital Currency Name'],
-        price: parseFloat(latestData[`1a. price (${market})`]),
-        volume: parseFloat(latestData['5. volume']),
-        lastRefreshed: data['Meta Data']['6. Last Refreshed']
+        symbol: crypto.symbol,
+        name: crypto.name,
+        price: crypto.quote.USD.price,
+        volume: crypto.quote.USD.volume_24h,
+        change: crypto.quote.USD.percent_change_24h,
+        lastRefreshed: crypto.last_updated
       };
     } else {
       throw new Error('Crypto data not available');
@@ -95,7 +86,6 @@ export async function fetchCryptoData(symbol, market = 'USD') {
 export async function fetchStockTimeSeries(symbol, interval = 'daily') {
   let timeSeriesFunction;
   
-  // Map interval to API function name
   switch (interval) {
     case 'intraday':
       timeSeriesFunction = 'TIME_SERIES_INTRADAY';
@@ -118,12 +108,10 @@ export async function fetchStockTimeSeries(symbol, interval = 'daily') {
     const response = await fetch(url);
     const data = await response.json();
     
-    // Find the time series key (it varies by function)
     const timeSeriesKey = Object.keys(data).find(key => key.includes('Time Series'));
     
     if (data[timeSeriesKey]) {
       const timeSeriesData = data[timeSeriesKey];
-      // Convert to array format for charts
       return Object.entries(timeSeriesData).map(([date, values]) => ({
         date,
         open: parseFloat(values['1. open']),
@@ -137,23 +125,6 @@ export async function fetchStockTimeSeries(symbol, interval = 'daily') {
     }
   } catch (error) {
     console.error('Time series API error:', error);
-    throw error;
-  }
-}
-
-// Get financial news
-export async function fetchFinancialNews(query = 'finance', pageSize = 10) {
-  try {
-    const response = await fetch(`https://newsapi.org/v2/everything?q=${query}&pageSize=${pageSize}&language=en&sortBy=publishedAt&apiKey=${NEWS_API_KEY}`);
-    const data = await response.json();
-    
-    if (data.status === 'ok') {
-      return data.articles;
-    } else {
-      throw new Error(data.message || 'News API error');
-    }
-  } catch (error) {
-    console.error('News fetch failed:', error);
     throw error;
   }
 }
@@ -187,7 +158,7 @@ export async function searchSymbol(keywords) {
 
 // Get major market indices (S&P 500, Dow, etc.)
 export async function getMarketIndices() {
-  const indices = ['SPY', 'DIA', 'QQQ', 'IWM']; // ETFs that track major indices
+  const indices = ['SPY', 'DIA', 'QQQ', 'IWM'];
   const promises = indices.map(symbol => fetchStockData(symbol));
   
   try {
@@ -213,16 +184,81 @@ export async function getMajorStocks() {
   }
 }
 
-// Get popular cryptocurrencies
+// Get popular cryptocurrencies using CoinMarketCap
 export async function getMajorCrypto() {
-  const cryptos = ['BTC', 'ETH', 'LTC', 'XRP', 'ADA'];
-  const promises = cryptos.map(symbol => fetchCryptoData(symbol));
-  
   try {
-    const results = await Promise.all(promises);
-    return results;
+    const response = await fetch('https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest?start=1&limit=10&convert=USD', {
+      headers: {
+        'X-CMC_PRO_API_KEY': CMC_API_KEY,
+        'Accept': 'application/json'
+      }
+    });
+    const data = await response.json();
+    
+    if (data.data) {
+      return data.data.map(crypto => ({
+        symbol: crypto.symbol,
+        name: crypto.name,
+        price: crypto.quote.USD.price,
+        volume: crypto.quote.USD.volume_24h,
+        change: crypto.quote.USD.percent_change_24h,
+        lastRefreshed: crypto.last_updated
+      }));
+    } else {
+      throw new Error('Crypto data not available');
+    }
   } catch (error) {
     console.error('Crypto data fetch failed:', error);
+    throw error;
+  }
+}
+
+// Get top gainers/losers using CoinMarketCap
+export async function getTopGainers() {
+  try {
+    const response = await fetch('https://pro-api.coinmarketcap.com/v1/cryptocurrency/trending/gainers-losers?start=1&limit=10&convert=USD', {
+      headers: {
+        'X-CMC_PRO_API_KEY': CMC_API_KEY,
+        'Accept': 'application/json'
+      }
+    });
+    const data = await response.json();
+    
+    if (data.data) {
+      return data.data;
+    } else {
+      throw new Error('Top gainers data not available');
+    }
+  } catch (error) {
+    console.error('Top gainers fetch failed:', error);
+    throw error;
+  }
+}
+
+// Get global market stats
+export async function getGlobalMarketStats() {
+  try {
+    const response = await fetch('https://pro-api.coinmarketcap.com/v1/global-metrics/quotes/latest', {
+      headers: {
+        'X-CMC_PRO_API_KEY': CMC_API_KEY,
+        'Accept': 'application/json'
+      }
+    });
+    const data = await response.json();
+    
+    if (data.data) {
+      return {
+        totalMarketCap: data.data.quote.USD.total_market_cap,
+        totalVolume: data.data.quote.USD.total_volume_24h,
+        btcDominance: data.data.btc_dominance,
+        activeCryptocurrencies: data.data.active_cryptocurrencies,
+        activeExchanges: data.data.active_exchanges
+      };
+    } else {
+      throw new Error('Global market data not available');
+    }
+  } catch (error) {
+    console.error('Global market data fetch failed:', error);
     throw error;
   }
 }

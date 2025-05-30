@@ -1,4 +1,3 @@
-
 // Simple currency converter functionality
 document.addEventListener('DOMContentLoaded', function() {
   console.log('Currency page loaded');
@@ -45,7 +44,11 @@ function initializeCurrencyConverter() {
     { code: 'GBP', name: 'British Pound' },
     { code: 'JPY', name: 'Japanese Yen' },
     { code: 'CAD', name: 'Canadian Dollar' },
-    { code: 'AUD', name: 'Australian Dollar' }
+    { code: 'AUD', name: 'Australian Dollar' },
+    { code: 'CHF', name: 'Swiss Franc' },
+    { code: 'CNY', name: 'Chinese Yuan' },
+    { code: 'SEK', name: 'Swedish Krona' },
+    { code: 'NZD', name: 'New Zealand Dollar' }
   ];
   
   // Clear existing options
@@ -72,7 +75,7 @@ function initializeCurrencyConverter() {
 }
 
 // Handle currency conversion with simple mock exchange rates
-function handleCurrencyConversion() {
+async function handleCurrencyConversion() {
   const fromCurrency = document.getElementById('from-currency').value;
   const toCurrency = document.getElementById('to-currency').value;
   const amount = parseFloat(document.getElementById('amount').value);
@@ -95,49 +98,20 @@ function handleCurrencyConversion() {
   if (resultElement) resultElement.style.display = 'none';
   if (loadingElement) loadingElement.style.display = 'flex';
   
-  // Simple mock exchange rates
-  const exchangeRates = {
-    'USD_EUR': 0.92,
-    'EUR_USD': 1.09,
-    'USD_GBP': 0.79,
-    'GBP_USD': 1.27,
-    'USD_JPY': 150.25,
-    'JPY_USD': 0.0067,
-    'USD_CAD': 1.36,
-    'CAD_USD': 0.74,
-    'USD_AUD': 1.52,
-    'AUD_USD': 0.66,
-    'EUR_GBP': 0.86,
-    'GBP_EUR': 1.16
-  };
-  
-  // Simulate API delay
-  setTimeout(() => {
-    const rateKey = `${fromCurrency}_${toCurrency}`;
-    let exchangeRate = exchangeRates[rateKey];
+  try {
+    const exchangeData = await fetchExchangeRate(fromCurrency, toCurrency);
+    const convertedAmount = amount * exchangeData.rate;
     
-    // If no direct rate, use USD as base
-    if (!exchangeRate) {
-      const toUsdRate = exchangeRates[`${fromCurrency}_USD`] || 1;
-      const fromUsdRate = exchangeRates[`USD_${toCurrency}`] || 1;
-      exchangeRate = toUsdRate * fromUsdRate;
-    }
-    
-    // Default rate if still not found
-    if (!exchangeRate) {
-      exchangeRate = 1.0;
-    }
-    
-    const convertedAmount = amount * exchangeRate;
-    
-    // Show result
     if (resultElement) {
       resultElement.innerHTML = `
         <div class="text-2xl font-bold gradient-text mb-2">
           ${amount.toFixed(2)} ${fromCurrency} = ${convertedAmount.toFixed(2)} ${toCurrency}
         </div>
         <div class="text-gray-400 text-sm">
-          1 ${fromCurrency} = ${exchangeRate.toFixed(4)} ${toCurrency}
+          1 ${fromCurrency} = ${exchangeData.rate.toFixed(4)} ${toCurrency}
+        </div>
+        <div class="text-gray-400 text-xs mt-1">
+          Last updated: ${exchangeData.lastRefreshed}
         </div>
       `;
       resultElement.style.display = 'block';
@@ -145,11 +119,14 @@ function handleCurrencyConversion() {
     
     if (loadingElement) loadingElement.style.display = 'none';
     
-    // Add to history
     addToConversionHistory(fromCurrency, toCurrency, amount, convertedAmount);
-    
     showToast('Currency converted successfully');
-  }, 1000);
+    
+  } catch (error) {
+    console.error('Currency conversion failed:', error);
+    if (loadingElement) loadingElement.style.display = 'none';
+    showToast('Failed to get exchange rate. Please try again.', 'error');
+  }
 }
 
 // Swap currencies
@@ -167,30 +144,60 @@ function swapCurrencies() {
 }
 
 // Load major currency pairs with simple data
-function loadMajorCurrencyPairs() {
+async function loadMajorCurrencyPairs() {
   const majorPairsElement = document.getElementById('major-pairs');
   if (!majorPairsElement) return;
   
-  const majorPairs = [
-    { fromCurrency: 'EUR', toCurrency: 'USD', rate: 1.0867 },
-    { fromCurrency: 'USD', toCurrency: 'JPY', rate: 150.39 },
-    { fromCurrency: 'GBP', toCurrency: 'USD', rate: 1.2537 },
-    { fromCurrency: 'USD', toCurrency: 'CHF', rate: 0.9048 },
-    { fromCurrency: 'USD', toCurrency: 'CAD', rate: 1.3652 },
-    { fromCurrency: 'AUD', toCurrency: 'USD', rate: 0.6604 }
+  const pairs = [
+    { from: 'EUR', to: 'USD' },
+    { from: 'USD', to: 'JPY' },
+    { from: 'GBP', to: 'USD' },
+    { from: 'USD', to: 'CHF' },
+    { from: 'USD', to: 'CAD' },
+    { from: 'AUD', to: 'USD' }
   ];
   
-  let pairsHTML = '';
-  majorPairs.forEach(pair => {
-    pairsHTML += `
-      <div class="glass glass-hover rounded-lg p-4">
-        <div class="flex justify-between items-center">
-          <div class="font-semibold text-gold-400">${pair.fromCurrency}/${pair.toCurrency}</div>
-          <div class="text-lg">${pair.rate.toFixed(4)}</div>
-        </div>
-      </div>
-    `;
-  });
+  let pairsHTML = '<div class="animate-pulse text-gold-400">Loading exchange rates...</div>';
+  majorPairsElement.innerHTML = pairsHTML;
+  
+  try {
+    const pairPromises = pairs.map(async (pair) => {
+      try {
+        const data = await fetchExchangeRate(pair.from, pair.to);
+        return {
+          fromCurrency: pair.from,
+          toCurrency: pair.to,
+          rate: data.rate
+        };
+      } catch (error) {
+        console.error(`Failed to fetch ${pair.from}/${pair.to}:`, error);
+        return null;
+      }
+    });
+    
+    const results = await Promise.all(pairPromises);
+    const validResults = results.filter(result => result !== null);
+    
+    if (validResults.length > 0) {
+      pairsHTML = '';
+      validResults.forEach(pair => {
+        pairsHTML += `
+          <div class="glass glass-hover rounded-lg p-4">
+            <div class="flex justify-between items-center">
+              <div class="font-semibold text-gold-400">${pair.fromCurrency}/${pair.toCurrency}</div>
+              <div class="text-lg">${pair.rate.toFixed(4)}</div>
+            </div>
+          </div>
+        `;
+      });
+    } else {
+      pairsHTML = '<div class="text-red-500">Failed to load exchange rates</div>';
+    }
+    
+  } catch (error) {
+    console.error('Error loading major pairs:', error);
+    pairsHTML = '<div class="text-red-500">Failed to load exchange rates</div>';
+  }
   
   majorPairsElement.innerHTML = pairsHTML;
 }

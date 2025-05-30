@@ -3,42 +3,17 @@ import {
   fetchStockData,
   getMarketIndices,
   getMajorStocks,
-  getMajorCrypto
+  getMajorCrypto,
+  getGlobalMarketStats
 } from './api.js';
 
-// Fallback data for when API calls fail
-const fallbackMarketData = [
-  { symbol: 'SPY', price: 501.24, change: 1.53, changePercent: 0.31, latestTradingDay: new Date().toISOString().split('T')[0] },
-  { symbol: 'QQQ', price: 378.45, change: -2.15, changePercent: -0.56, latestTradingDay: new Date().toISOString().split('T')[0] },
-  { symbol: 'DIA', price: 390.82, change: 0.75, changePercent: 0.19, latestTradingDay: new Date().toISOString().split('T')[0] },
-  { symbol: 'IWM', price: 218.93, change: -0.42, changePercent: -0.19, latestTradingDay: new Date().toISOString().split('T')[0] }
-];
-
-const fallbackStockData = [
-  { symbol: 'AAPL', price: 189.25, change: 2.18, changePercent: 1.17, latestTradingDay: new Date().toISOString().split('T')[0] },
-  { symbol: 'MSFT', price: 415.67, change: -1.23, changePercent: -0.29, latestTradingDay: new Date().toISOString().split('T')[0] },
-  { symbol: 'GOOGL', price: 172.48, change: 3.45, changePercent: 2.04, latestTradingDay: new Date().toISOString().split('T')[0] },
-  { symbol: 'AMZN', price: 181.92, change: -0.87, changePercent: -0.47, latestTradingDay: new Date().toISOString().split('T')[0] },
-  { symbol: 'META', price: 524.31, change: 4.76, changePercent: 0.92, latestTradingDay: new Date().toISOString().split('T')[0] },
-  { symbol: 'TSLA', price: 183.54, change: -2.34, changePercent: -1.26, latestTradingDay: new Date().toISOString().split('T')[0] }
-];
-
-const fallbackCryptoData = [
-  { symbol: 'BTC', name: 'Bitcoin', price: 67420.50, volume: 28450000000 },
-  { symbol: 'ETH', name: 'Ethereum', price: 3890.75, volume: 15230000000 },
-  { symbol: 'LTC', name: 'Litecoin', price: 95.42, volume: 580000000 },
-  { symbol: 'XRP', name: 'Ripple', price: 0.5234, volume: 1200000000 },
-  { symbol: 'ADA', name: 'Cardano', price: 0.4567, volume: 890000000 }
-];
-
 document.addEventListener('DOMContentLoaded', async function() {
-  // Initialize dashboard elements with real or fallback data
   await initializeMarketOverview();
   await initializeWatchlist();
   await initializeCryptoTracker();
+  await initializeGlobalStats();
   updateDateTime();
   
-  // Set up refresh button
   const refreshBtn = document.getElementById('refresh-dashboard');
   if (refreshBtn) {
     refreshBtn.addEventListener('click', async function() {
@@ -52,7 +27,6 @@ document.addEventListener('DOMContentLoaded', async function() {
   }
 });
 
-// Update date and time
 function updateDateTime() {
   const dateTimeElement = document.getElementById('current-datetime');
   if (dateTimeElement) {
@@ -70,27 +44,19 @@ function updateDateTime() {
       });
     };
     
-    updateTime(); // Update immediately
+    updateTime();
     setInterval(updateTime, 1000);
   }
 }
 
-// Initialize market overview section with real or fallback data
 async function initializeMarketOverview() {
   const marketOverviewElement = document.getElementById('market-overview');
   if (!marketOverviewElement) return;
   
   try {
-    // Show loading state
     marketOverviewElement.innerHTML = '<div class="col-span-full text-center text-gold-400">Loading market data...</div>';
     
-    let marketIndices;
-    try {
-      marketIndices = await getMarketIndices();
-    } catch (error) {
-      console.log('Using fallback market data due to API error:', error);
-      marketIndices = fallbackMarketData;
-    }
+    const marketIndices = await getMarketIndices();
     
     let marketOverviewHTML = '';
     marketIndices.forEach(index => {
@@ -123,26 +89,18 @@ async function initializeMarketOverview() {
     marketOverviewElement.innerHTML = marketOverviewHTML;
   } catch (error) {
     console.error('Error initializing market overview:', error);
-    marketOverviewElement.innerHTML = '<div class="col-span-full text-center text-red-500">Failed to load market data</div>';
+    marketOverviewElement.innerHTML = '<div class="col-span-full text-center text-red-500">Failed to load market data. Please check your internet connection.</div>';
   }
 }
 
-// Initialize watchlist section with real or fallback data
 async function initializeWatchlist() {
   const watchlistElement = document.getElementById('watchlist');
   if (!watchlistElement) return;
   
   try {
-    // Show loading state
     watchlistElement.innerHTML = '<div class="col-span-full text-center text-gold-400">Loading stock data...</div>';
     
-    let stocks;
-    try {
-      stocks = await getMajorStocks();
-    } catch (error) {
-      console.log('Using fallback stock data due to API error:', error);
-      stocks = fallbackStockData;
-    }
+    const stocks = await getMajorStocks();
     
     let watchlistHTML = '';
     stocks.forEach(stock => {
@@ -175,30 +133,25 @@ async function initializeWatchlist() {
     watchlistElement.innerHTML = watchlistHTML;
   } catch (error) {
     console.error('Error initializing watchlist:', error);
-    watchlistElement.innerHTML = '<div class="col-span-full text-center text-red-500">Failed to load stock data</div>';
+    watchlistElement.innerHTML = '<div class="col-span-full text-center text-red-500">Failed to load stock data. Please check your internet connection.</div>';
   }
 }
 
-// Initialize crypto tracker section with real or fallback data
 async function initializeCryptoTracker() {
   const cryptoTrackerElement = document.getElementById('crypto-tracker');
   if (!cryptoTrackerElement) return;
   
   try {
-    // Show loading state
     cryptoTrackerElement.innerHTML = '<div class="col-span-full text-center text-gold-400">Loading crypto data...</div>';
     
-    let cryptos;
-    try {
-      cryptos = await getMajorCrypto();
-    } catch (error) {
-      console.log('Using fallback crypto data due to API error:', error);
-      cryptos = fallbackCryptoData;
-    }
+    const cryptos = await getMajorCrypto();
     
     let cryptoHTML = '';
     cryptos.forEach(crypto => {
       if (crypto) {
+        const changeClass = crypto.change >= 0 ? 'text-neon-green' : 'text-red-500';
+        const changeIcon = crypto.change >= 0 ? '▲' : '▼';
+        
         cryptoHTML += `
           <div class="glass glass-hover rounded-lg p-4">
             <div class="flex justify-between items-center">
@@ -208,7 +161,10 @@ async function initializeCryptoTracker() {
               </div>
               <div class="text-right">
                 <div class="text-xl font-bold">${formatCurrency(crypto.price, 'USD')}</div>
-                <div class="text-sm text-gray-400">Vol: ${crypto.volume.toLocaleString()}</div>
+                <div class="flex items-center ${changeClass}">
+                  <span>${changeIcon} ${crypto.change.toFixed(2)}%</span>
+                </div>
+                <div class="text-sm text-gray-400">Vol: ${formatVolume(crypto.volume)}</div>
               </div>
             </div>
           </div>
@@ -219,16 +175,54 @@ async function initializeCryptoTracker() {
     cryptoTrackerElement.innerHTML = cryptoHTML;
   } catch (error) {
     console.error('Error initializing crypto tracker:', error);
-    cryptoTrackerElement.innerHTML = '<div class="col-span-full text-center text-red-500">Failed to load crypto data</div>';
+    cryptoTrackerElement.innerHTML = '<div class="col-span-full text-center text-red-500">Failed to load crypto data. Please check your internet connection.</div>';
   }
 }
 
-// Refresh all dashboard data
+async function initializeGlobalStats() {
+  const globalStatsElement = document.getElementById('global-stats');
+  if (!globalStatsElement) return;
+  
+  try {
+    const stats = await getGlobalMarketStats();
+    
+    const globalStatsHTML = `
+      <div class="glass rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-gold-400 mb-4">Global Market Stats</h3>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <p class="text-gray-400 text-sm">Total Market Cap</p>
+            <p class="text-xl font-bold">${formatCurrency(stats.totalMarketCap, 'USD')}</p>
+          </div>
+          <div>
+            <p class="text-gray-400 text-sm">24h Volume</p>
+            <p class="text-xl font-bold">${formatVolume(stats.totalVolume)}</p>
+          </div>
+          <div>
+            <p class="text-gray-400 text-sm">BTC Dominance</p>
+            <p class="text-xl font-bold">${stats.btcDominance.toFixed(1)}%</p>
+          </div>
+          <div>
+            <p class="text-gray-400 text-sm">Active Cryptos</p>
+            <p class="text-xl font-bold">${stats.activeCryptocurrencies.toLocaleString()}</p>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    globalStatsElement.innerHTML = globalStatsHTML;
+  } catch (error) {
+    console.error('Error loading global stats:', error);
+    globalStatsElement.innerHTML = '<div class="text-red-500">Failed to load global market stats</div>';
+  }
+}
+
 async function refreshDashboardData() {
   try {
     await initializeMarketOverview();
     await initializeWatchlist();
     await initializeCryptoTracker();
+    await initializeGlobalStats();
     return true;
   } catch (error) {
     console.error('Error refreshing dashboard data:', error);
@@ -237,7 +231,6 @@ async function refreshDashboardData() {
   }
 }
 
-// Currency formatting function
 function formatCurrency(amount, currency = 'USD') {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -247,7 +240,20 @@ function formatCurrency(amount, currency = 'USD') {
   }).format(amount);
 }
 
-// Toast notification function
+function formatVolume(volume) {
+  if (volume >= 1e12) {
+    return '$' + (volume / 1e12).toFixed(1) + 'T';
+  } else if (volume >= 1e9) {
+    return '$' + (volume / 1e9).toFixed(1) + 'B';
+  } else if (volume >= 1e6) {
+    return '$' + (volume / 1e6).toFixed(1) + 'M';
+  } else if (volume >= 1e3) {
+    return '$' + (volume / 1e3).toFixed(1) + 'K';
+  } else {
+    return '$' + volume.toFixed(0);
+  }
+}
+
 function showToast(message, type = 'success') {
   const toast = document.getElementById('toast');
   const toastMessage = document.getElementById('toast-message');
