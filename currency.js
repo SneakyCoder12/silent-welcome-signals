@@ -1,8 +1,7 @@
-// Simple currency converter functionality
+// Currency converter functionality using Frankfurter API
 document.addEventListener('DOMContentLoaded', function() {
   console.log('Currency page loaded');
   
-  // Initialize the page
   initializeCurrencyConverter();
   loadMajorCurrencyPairs();
   setupEventListeners();
@@ -48,7 +47,9 @@ function initializeCurrencyConverter() {
     { code: 'CHF', name: 'Swiss Franc' },
     { code: 'CNY', name: 'Chinese Yuan' },
     { code: 'SEK', name: 'Swedish Krona' },
-    { code: 'NZD', name: 'New Zealand Dollar' }
+    { code: 'NZD', name: 'New Zealand Dollar' },
+    { code: 'AED', name: 'UAE Dirham' },
+    { code: 'INR', name: 'Indian Rupee' }
   ];
   
   // Clear existing options
@@ -99,33 +100,50 @@ async function handleCurrencyConversion() {
   if (loadingElement) loadingElement.style.display = 'flex';
   
   try {
-    const exchangeData = await fetchExchangeRate(fromCurrency, toCurrency);
-    const convertedAmount = amount * exchangeData.rate;
-    
-    if (resultElement) {
-      resultElement.innerHTML = `
-        <div class="text-2xl font-bold gradient-text mb-2">
-          ${amount.toFixed(2)} ${fromCurrency} = ${convertedAmount.toFixed(2)} ${toCurrency}
-        </div>
-        <div class="text-gray-400 text-sm">
-          1 ${fromCurrency} = ${exchangeData.rate.toFixed(4)} ${toCurrency}
-        </div>
-        <div class="text-gray-400 text-xs mt-1">
-          Last updated: ${exchangeData.lastRefreshed}
-        </div>
-      `;
-      resultElement.style.display = 'block';
+    const exchangeRate = await convertCurrency(fromCurrency, toCurrency);
+    if (exchangeRate) {
+      const convertedAmount = amount * exchangeRate;
+      
+      if (resultElement) {
+        resultElement.innerHTML = `
+          <div class="text-2xl font-bold gradient-text mb-2">
+            ${amount.toFixed(2)} ${fromCurrency} = ${convertedAmount.toFixed(2)} ${toCurrency}
+          </div>
+          <div class="text-gray-400 text-sm">
+            1 ${fromCurrency} = ${exchangeRate.toFixed(4)} ${toCurrency}
+          </div>
+          <div class="text-gray-400 text-xs mt-1">
+            Last updated: ${new Date().toLocaleDateString()}
+          </div>
+        `;
+        resultElement.style.display = 'block';
+      }
+      
+      addToConversionHistory(fromCurrency, toCurrency, amount, convertedAmount);
+      showToast('Currency converted successfully');
+    } else {
+      throw new Error('Failed to get exchange rate');
     }
-    
-    if (loadingElement) loadingElement.style.display = 'none';
-    
-    addToConversionHistory(fromCurrency, toCurrency, amount, convertedAmount);
-    showToast('Currency converted successfully');
     
   } catch (error) {
     console.error('Currency conversion failed:', error);
-    if (loadingElement) loadingElement.style.display = 'none';
     showToast('Failed to get exchange rate. Please try again.', 'error');
+  } finally {
+    if (loadingElement) loadingElement.style.display = 'none';
+  }
+}
+
+// Convert currency using Frankfurter API
+async function convertCurrency(from = 'USD', to = 'GBP') {
+  const url = `https://api.frankfurter.app/latest?from=${from}&to=${to}`;
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    console.log(`1 ${from} = ${data.rates[to]} ${to}`);
+    return data.rates[to];
+  } catch (err) {
+    console.error('Currency fetch failed:', err);
+    return null;
   }
 }
 
@@ -154,21 +172,22 @@ async function loadMajorCurrencyPairs() {
     { from: 'GBP', to: 'USD' },
     { from: 'USD', to: 'CHF' },
     { from: 'USD', to: 'CAD' },
-    { from: 'AUD', to: 'USD' }
+    { from: 'AUD', to: 'USD' },
+    { from: 'USD', to: 'AED' },
+    { from: 'USD', to: 'INR' }
   ];
   
-  let pairsHTML = '<div class="animate-pulse text-gold-400">Loading exchange rates...</div>';
-  majorPairsElement.innerHTML = pairsHTML;
+  majorPairsElement.innerHTML = '<div class="animate-pulse text-gold-400">Loading exchange rates...</div>';
   
   try {
     const pairPromises = pairs.map(async (pair) => {
       try {
-        const data = await fetchExchangeRate(pair.from, pair.to);
-        return {
+        const rate = await convertCurrency(pair.from, pair.to);
+        return rate ? {
           fromCurrency: pair.from,
           toCurrency: pair.to,
-          rate: data.rate
-        };
+          rate: rate
+        } : null;
       } catch (error) {
         console.error(`Failed to fetch ${pair.from}/${pair.to}:`, error);
         return null;
@@ -179,7 +198,7 @@ async function loadMajorCurrencyPairs() {
     const validResults = results.filter(result => result !== null);
     
     if (validResults.length > 0) {
-      pairsHTML = '';
+      let pairsHTML = '';
       validResults.forEach(pair => {
         pairsHTML += `
           <div class="glass glass-hover rounded-lg p-4">
@@ -190,16 +209,15 @@ async function loadMajorCurrencyPairs() {
           </div>
         `;
       });
+      majorPairsElement.innerHTML = pairsHTML;
     } else {
-      pairsHTML = '<div class="text-red-500">Failed to load exchange rates</div>';
+      majorPairsElement.innerHTML = '<div class="text-red-500">Failed to load exchange rates</div>';
     }
     
   } catch (error) {
     console.error('Error loading major pairs:', error);
-    pairsHTML = '<div class="text-red-500">Failed to load exchange rates</div>';
+    majorPairsElement.innerHTML = '<div class="text-red-500">Failed to load exchange rates</div>';
   }
-  
-  majorPairsElement.innerHTML = pairsHTML;
 }
 
 // Add to conversion history

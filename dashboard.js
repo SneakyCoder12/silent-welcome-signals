@@ -1,6 +1,4 @@
-
 import { 
-  fetchStockData,
   getMarketIndices,
   getMajorStocks,
   getMajorCrypto,
@@ -71,7 +69,7 @@ async function initializeMarketOverview() {
             <div class="flex justify-between items-center">
               <div>
                 <h3 class="font-semibold text-gold-400">${index.symbol}</h3>
-                <span class="text-sm text-gray-400">${index.latestTradingDay}</span>
+                <span class="text-sm text-gray-400">${index.name || index.symbol}</span>
               </div>
               <div class="text-right">
                 <div class="text-xl font-bold">${formatCurrency(index.price, 'USD')}</div>
@@ -89,7 +87,7 @@ async function initializeMarketOverview() {
     marketOverviewElement.innerHTML = marketOverviewHTML;
   } catch (error) {
     console.error('Error initializing market overview:', error);
-    marketOverviewElement.innerHTML = '<div class="col-span-full text-center text-red-500">Failed to load market data. Please check your internet connection.</div>';
+    marketOverviewElement.innerHTML = '<div class="col-span-full text-center text-red-500">Failed to load market data. Please check your API connection.</div>';
   }
 }
 
@@ -115,7 +113,7 @@ async function initializeWatchlist() {
             <div class="flex justify-between items-center">
               <div>
                 <h3 class="font-semibold text-gold-400">${stock.symbol}</h3>
-                <span class="text-sm text-gray-400">${stock.latestTradingDay}</span>
+                <span class="text-sm text-gray-400">${stock.name}</span>
               </div>
               <div class="text-right">
                 <div class="text-xl font-bold">${formatCurrency(stock.price, 'USD')}</div>
@@ -133,7 +131,7 @@ async function initializeWatchlist() {
     watchlistElement.innerHTML = watchlistHTML;
   } catch (error) {
     console.error('Error initializing watchlist:', error);
-    watchlistElement.innerHTML = '<div class="col-span-full text-center text-red-500">Failed to load stock data. Please check your internet connection.</div>';
+    watchlistElement.innerHTML = '<div class="col-span-full text-center text-red-500">Failed to load stock data. Please check your API connection.</div>';
   }
 }
 
@@ -175,7 +173,7 @@ async function initializeCryptoTracker() {
     cryptoTrackerElement.innerHTML = cryptoHTML;
   } catch (error) {
     console.error('Error initializing crypto tracker:', error);
-    cryptoTrackerElement.innerHTML = '<div class="col-span-full text-center text-red-500">Failed to load crypto data. Please check your internet connection.</div>';
+    cryptoTrackerElement.innerHTML = '<div class="col-span-full text-center text-red-500">Failed to load crypto data. Please check your API connection.</div>';
   }
 }
 

@@ -1,31 +1,78 @@
 
 // Financial data API service
-// Using CoinMarketCap for crypto data, Frankfurter for currency, and Alpha Vantage for stocks
+// Using CoinMarketCap, Twelve Data, Frankfurter, and Alpha Vantage APIs
 
 const CMC_API_KEY = '478085d0-7f9b-44bb-9b5e-f88abf9f5a3a';
+const TWELVE_DATA_API_KEY = '6b49010b45c74440923790d98203c9e5';
 const ALPHA_VANTAGE_API_KEY = 'RGHLGIFYBZMTCTFF';
 
-// Get stock quote data
+// Get stock quote data using Twelve Data
 export async function fetchStockData(symbol) {
   try {
-    const response = await fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${ALPHA_VANTAGE_API_KEY}`);
+    const response = await fetch(`https://api.twelvedata.com/quote?symbol=${symbol}&apikey=${TWELVE_DATA_API_KEY}`);
     const data = await response.json();
     
-    if (data['Global Quote']) {
-      const quote = data['Global Quote'];
+    if (data.price) {
       return {
-        symbol: quote['01. symbol'],
-        price: parseFloat(quote['05. price']),
-        change: parseFloat(quote['09. change']),
-        changePercent: parseFloat(quote['10. change percent'].replace('%', '')),
-        volume: parseInt(quote['06. volume']),
-        latestTradingDay: quote['07. latest trading day']
+        symbol: data.symbol,
+        name: data.name,
+        price: parseFloat(data.price),
+        change: parseFloat(data.change),
+        changePercent: parseFloat(data.percent_change),
+        volume: parseInt(data.volume) || 0,
+        lastUpdated: data.datetime
       };
     } else {
       throw new Error('No stock data found');
     }
   } catch (error) {
     console.error('Failed to get stock data for', symbol, ':', error);
+    throw error;
+  }
+}
+
+// Get multiple stocks data using Twelve Data batch request
+export async function fetchMultipleStocks(symbols) {
+  try {
+    const symbolString = symbols.join(',');
+    const response = await fetch(`https://api.twelvedata.com/quote?symbol=${symbolString}&apikey=${TWELVE_DATA_API_KEY}`);
+    const data = await response.json();
+    
+    const results = [];
+    
+    // Handle both single and multiple symbols response
+    if (symbols.length === 1) {
+      if (data.price) {
+        results.push({
+          symbol: data.symbol,
+          name: data.name,
+          price: parseFloat(data.price),
+          change: parseFloat(data.change),
+          changePercent: parseFloat(data.percent_change),
+          volume: parseInt(data.volume) || 0,
+          lastUpdated: data.datetime
+        });
+      }
+    } else {
+      symbols.forEach(symbol => {
+        if (data[symbol] && data[symbol].price) {
+          const stock = data[symbol];
+          results.push({
+            symbol: stock.symbol,
+            name: stock.name,
+            price: parseFloat(stock.price),
+            change: parseFloat(stock.change),
+            changePercent: parseFloat(stock.percent_change),
+            volume: parseInt(stock.volume) || 0,
+            lastUpdated: stock.datetime
+          });
+        }
+      });
+    }
+    
+    return results;
+  } catch (error) {
+    console.error('Failed to get multiple stocks data:', error);
     throw error;
   }
 }
@@ -82,102 +129,22 @@ export async function fetchCryptoData(symbol) {
   }
 }
 
-// Get historical price data for charts
-export async function fetchStockTimeSeries(symbol, interval = 'daily') {
-  let timeSeriesFunction;
-  
-  switch (interval) {
-    case 'intraday':
-      timeSeriesFunction = 'TIME_SERIES_INTRADAY';
-      break;
-    case 'daily':
-      timeSeriesFunction = 'TIME_SERIES_DAILY';
-      break;
-    case 'weekly':
-      timeSeriesFunction = 'TIME_SERIES_WEEKLY';
-      break;
-    case 'monthly':
-      timeSeriesFunction = 'TIME_SERIES_MONTHLY';
-      break;
-    default:
-      timeSeriesFunction = 'TIME_SERIES_DAILY';
-  }
-  
-  try {
-    const url = `https://www.alphavantage.co/query?function=${timeSeriesFunction}&symbol=${symbol}&outputsize=compact${interval === 'intraday' ? '&interval=5min' : ''}&apikey=${ALPHA_VANTAGE_API_KEY}`;
-    const response = await fetch(url);
-    const data = await response.json();
-    
-    const timeSeriesKey = Object.keys(data).find(key => key.includes('Time Series'));
-    
-    if (data[timeSeriesKey]) {
-      const timeSeriesData = data[timeSeriesKey];
-      return Object.entries(timeSeriesData).map(([date, values]) => ({
-        date,
-        open: parseFloat(values['1. open']),
-        high: parseFloat(values['2. high']),
-        low: parseFloat(values['3. low']),
-        close: parseFloat(values['4. close']),
-        volume: parseInt(values['5. volume'])
-      })).sort((a, b) => new Date(a.date) - new Date(b.date));
-    } else {
-      throw new Error('No time series data available');
-    }
-  } catch (error) {
-    console.error('Time series API error:', error);
-    throw error;
-  }
-}
-
-// Search for stock symbols
-export async function searchSymbol(keywords) {
-  try {
-    const response = await fetch(`https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${keywords}&apikey=${ALPHA_VANTAGE_API_KEY}`);
-    const data = await response.json();
-    
-    if (data.bestMatches) {
-      return data.bestMatches.map(match => ({
-        symbol: match['1. symbol'],
-        name: match['2. name'],
-        type: match['3. type'],
-        region: match['4. region'],
-        marketOpen: match['5. marketOpen'],
-        marketClose: match['6. marketClose'],
-        timezone: match['7. timezone'],
-        currency: match['8. currency'],
-        matchScore: match['9. matchScore']
-      }));
-    } else {
-      throw new Error('Symbol search failed');
-    }
-  } catch (error) {
-    console.error('Symbol search error:', error);
-    throw error;
-  }
-}
-
-// Get major market indices (S&P 500, Dow, etc.)
+// Get major market indices using Twelve Data
 export async function getMarketIndices() {
-  const indices = ['SPY', 'DIA', 'QQQ', 'IWM'];
-  const promises = indices.map(symbol => fetchStockData(symbol));
-  
+  const indices = ['SPY', 'QQQ', 'DIA', 'IWM'];
   try {
-    const results = await Promise.all(promises);
-    return results;
+    return await fetchMultipleStocks(indices);
   } catch (error) {
     console.error('Market indices fetch failed:', error);
     throw error;
   }
 }
 
-// Get major tech stocks
+// Get major tech stocks using Twelve Data
 export async function getMajorStocks() {
   const stocks = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA'];
-  const promises = stocks.map(symbol => fetchStockData(symbol));
-  
   try {
-    const results = await Promise.all(promises);
-    return results;
+    return await fetchMultipleStocks(stocks);
   } catch (error) {
     console.error('Major stocks fetch failed:', error);
     throw error;
@@ -213,29 +180,7 @@ export async function getMajorCrypto() {
   }
 }
 
-// Get top gainers/losers using CoinMarketCap
-export async function getTopGainers() {
-  try {
-    const response = await fetch('https://pro-api.coinmarketcap.com/v1/cryptocurrency/trending/gainers-losers?start=1&limit=10&convert=USD', {
-      headers: {
-        'X-CMC_PRO_API_KEY': CMC_API_KEY,
-        'Accept': 'application/json'
-      }
-    });
-    const data = await response.json();
-    
-    if (data.data) {
-      return data.data;
-    } else {
-      throw new Error('Top gainers data not available');
-    }
-  } catch (error) {
-    console.error('Top gainers fetch failed:', error);
-    throw error;
-  }
-}
-
-// Get global market stats
+// Get global market stats using CoinMarketCap
 export async function getGlobalMarketStats() {
   try {
     const response = await fetch('https://pro-api.coinmarketcap.com/v1/global-metrics/quotes/latest', {
@@ -261,4 +206,54 @@ export async function getGlobalMarketStats() {
     console.error('Global market data fetch failed:', error);
     throw error;
   }
+}
+
+// Search for stock symbols using Twelve Data
+export async function searchSymbol(keywords) {
+  try {
+    const response = await fetch(`https://api.twelvedata.com/symbol_search?symbol=${keywords}&apikey=${TWELVE_DATA_API_KEY}`);
+    const data = await response.json();
+    
+    if (data.data) {
+      return data.data.map(match => ({
+        symbol: match.symbol,
+        name: match.instrument_name,
+        type: match.instrument_type,
+        exchange: match.exchange,
+        currency: match.currency,
+        country: match.country
+      }));
+    } else {
+      throw new Error('Symbol search failed');
+    }
+  } catch (error) {
+    console.error('Symbol search error:', error);
+    throw error;
+  }
+}
+
+// Simple news API function (using NewsAPI or similar free service)
+export async function fetchFinancialNews(query, limit = 10) {
+  // For demo purposes, return some financial news
+  // In production, you'd use a real news API
+  const mockNews = [
+    {
+      title: "Markets Rally on Economic Data",
+      description: "Stock markets surged today following positive economic indicators and corporate earnings reports.",
+      url: "https://example.com/news1",
+      urlToImage: "https://images.pexels.com/photos/187041/pexels-photo-187041.jpeg?auto=compress&cs=tinysrgb&h=350",
+      source: { name: "Financial Times" },
+      publishedAt: new Date().toISOString()
+    },
+    {
+      title: "Crypto Market Update",
+      description: "Bitcoin and major altcoins show strong performance amid institutional adoption.",
+      url: "https://example.com/news2", 
+      urlToImage: "https://images.pexels.com/photos/844124/pexels-photo-844124.jpeg?auto=compress&cs=tinysrgb&h=350",
+      source: { name: "CoinDesk" },
+      publishedAt: new Date().toISOString()
+    }
+  ];
+  
+  return mockNews.slice(0, limit);
 }
