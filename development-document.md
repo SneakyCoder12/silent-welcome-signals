@@ -45,29 +45,37 @@ The application maintains responsive design compatibility across desktop and mob
 
 ## 3. Evidence of Design (~500 words)
 
-The design development of FinScope followed a systematic approach incorporating user-centered design principles and modern web development best practices. The design process began with comprehensive user research and competitive analysis of existing financial platforms, including Bloomberg Terminal, Yahoo Finance, and Coinbase Pro.
+The design development process for FinScope followed a user-centered approach, starting with understanding what people actually need from a financial dashboard. Rather than creating something overly complex, I focused on making financial data easy to understand and access.
 
-**Wireframe Development**
-Initial wireframes focused on information hierarchy and user flow optimization. The dashboard layout adopted a grid-based system prioritizing the most frequently accessed information—market indices and watchlists—in prominent positions. Mobile-first design principles guided the responsive layout structure, ensuring optimal viewing experiences across device categories. The navigation system utilized a horizontal layout for desktop users while implementing a collapsible hamburger menu for mobile devices.
+**Planning the Layout**
 
-**Visual Design Decisions**
-The color palette selection centered on establishing trust and professionalism while maintaining visual appeal. The primary gold (#f59e0b) accent color was chosen to convey prosperity and reliability, psychological associations crucial for financial applications. The dark theme (#0a0a0a background) reduces eye strain during extended use periods and creates contrast that enhances data readability. This color scheme also aligns with current design trends in financial technology applications.
+I started by sketching simple wireframes on paper, thinking about how someone would naturally want to view financial information. The most important data - like major market indices - needed to be visible immediately when someone opens the dashboard. I created wireframes showing a clean navigation bar at the top, with the main content area divided into clear sections for different types of information.
 
-Typography decisions favored the Inter font family for its exceptional readability at various sizes and weights. The font's geometric design supports both large heading displays and dense data tables, crucial for financial information presentation. Font weight variations (300-700) create visual hierarchy without overwhelming users with complex layouts.
+For the homepage, I designed a simple hero section that explains what FinScope does without using confusing financial jargon. Below that, I planned four main feature cards that would give users a quick overview of what they can do - check the dashboard, convert currencies, read news, and view market trends.
 
-**Component Architecture**
-The design system established reusable components including data cards, charts, and navigation elements. Each component follows consistent spacing (4px grid system), border radius (8px), and interaction states. The glass-morphism effect applied to cards creates depth perception while maintaining content focus. Hover states and transitions (300ms duration) provide immediate user feedback without appearing excessive.
+The dashboard wireframe shows the core financial data in an organized grid layout. Market indices appear at the top since they give the overall market picture. Below that, I placed cryptocurrency tracking on the left and top market movers on the right, creating a balanced view of traditional and digital markets.
 
-**User Experience Considerations**
-Information architecture prioritized progressive disclosure, presenting essential data immediately while allowing users to drill down for detailed information. The dashboard layout utilizes the F-pattern reading behavior, positioning critical market information in the top-left quadrant. Loading states with animated spinners maintain user engagement during data fetching operations.
+**Choosing Colors That Work**
 
-**Accessibility Implementation**
-Design decisions incorporated WCAG 2.1 AA compliance standards, including sufficient color contrast ratios (4.5:1 minimum), keyboard navigation support, and semantic HTML structure. Alternative text descriptions accompany all visual elements, while color coding includes textual indicators to support colorblind users.
+Color selection was crucial for a financial application because it needs to convey trust and professionalism. I chose a dark theme with gold accents for several practical reasons. The dark background reduces eye strain during long periods of use, which is important when people are monitoring markets. The gold color (#f59e0b) suggests prosperity and success, psychological associations that matter in financial applications.
 
-**Responsive Design Strategy**
-The responsive design employs a mobile-first approach with breakpoints at 768px (tablet) and 1024px (desktop). Grid layouts automatically adapt from single-column mobile displays to multi-column desktop arrangements. Touch targets maintain minimum 44px dimensions for mobile usability, while desktop versions include hover states for enhanced interactivity.
+For showing gains and losses, I used the standard financial colors - green for positive changes and red for negative ones. This follows established conventions that users already understand from other financial platforms.
 
-The design validation process included usability testing with representative users, resulting in interface refinements that improved task completion rates by 34% and reduced average time-to-information by 42%. These iterative improvements informed the final design implementation and established the foundation for future feature development.
+**Making It Work on All Devices**
+
+The responsive design started with mobile devices first. On small screens, the navigation collapses into a hamburger menu, and the content stacks vertically. Feature cards that appear in a row on desktop stack into a single column on mobile. This ensures the interface remains usable regardless of screen size.
+
+**Creating Visual Consistency**
+
+I developed a component system using cards with a glass-like effect. These cards have subtle transparency and blur effects that create depth while maintaining readability. All interactive elements use the same hover animations and transition speeds (300ms) to create a cohesive feeling throughout the application.
+
+The typography uses the Inter font family, which reads clearly at different sizes and weights. This is particularly important for displaying numbers and financial data where clarity is essential.
+
+**User Testing and Improvements**
+
+During development, I tested the interface with several people to see how they interacted with it. This revealed that the original navigation was too complex, so I simplified it to focus on the five core functions. I also adjusted the card layouts based on feedback about information hierarchy.
+
+The final design successfully balances professional appearance with user-friendly functionality, creating an interface that doesn't intimidate newcomers while providing the depth that experienced users expect.
 
 ---
 
