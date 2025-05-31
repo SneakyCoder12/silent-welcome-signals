@@ -1,81 +1,63 @@
-// Currency converter functionality using Frankfurter API
-document.addEventListener('DOMContentLoaded', function() {
-  console.log('Currency page loaded');
-  
-  initializeCurrencyConverter();
-  loadMajorCurrencyPairs();
-  setupEventListeners();
-  loadConversionHistory();
+
+document.addEventListener('DOMContentLoaded', function () {
+  initializeCurrencyConverter(); // Fill currency dropdowns
+  setupEventListeners();        // Set up button/input interactions
+  loadMajorCurrencyPairs();     // Load popular currency exchange rates
+  loadConversionHistory();      // Load and display previous conversions
 });
 
-// Setup event listeners
+// Sets up event listeners for user interactions
 function setupEventListeners() {
   const convertBtn = document.getElementById('convert-btn');
   const swapBtn = document.getElementById('swap-currencies');
   const amountInput = document.getElementById('amount');
-  
+
+  // When the convert button is clicked run the conversion
   if (convertBtn) {
     convertBtn.addEventListener('click', handleCurrencyConversion);
   }
-  
+
+  // When the swap button is clicked switch the currencies
   if (swapBtn) {
     swapBtn.addEventListener('click', swapCurrencies);
   }
-  
+
+  // Restrict the amount input to numbers and dots only
   if (amountInput) {
-    amountInput.addEventListener('input', function() {
+    amountInput.addEventListener('input', function () {
       this.value = this.value.replace(/[^0-9.]/g, '');
     });
   }
 }
 
-// Initialize currency converter with simple currency list
+// Initializes the dropdowns with a list of popular currencies
 function initializeCurrencyConverter() {
   const fromCurrencySelect = document.getElementById('from-currency');
   const toCurrencySelect = document.getElementById('to-currency');
-  
+
   if (!fromCurrencySelect || !toCurrencySelect) return;
-  
-  // Simple list of currencies
-  const currencies = [
-    { code: 'USD', name: 'US Dollar' },
-    { code: 'EUR', name: 'Euro' },
-    { code: 'GBP', name: 'British Pound' },
-    { code: 'JPY', name: 'Japanese Yen' },
-    { code: 'CAD', name: 'Canadian Dollar' },
-    { code: 'AUD', name: 'Australian Dollar' },
-    { code: 'CHF', name: 'Swiss Franc' },
-    { code: 'CNY', name: 'Chinese Yuan' },
-    { code: 'SEK', name: 'Swedish Krona' },
-    { code: 'NZD', name: 'New Zealand Dollar' },
-    { code: 'AED', name: 'UAE Dirham' },
-    { code: 'INR', name: 'Indian Rupee' }
-  ];
-  
-  // Clear existing options
-  fromCurrencySelect.innerHTML = '';
-  toCurrencySelect.innerHTML = '';
-  
-  // Add options to both selects
-  currencies.forEach(currency => {
+
+  const currencies = ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CHF'];
+
+  // Add each currency to both dropdowns
+  currencies.forEach(code => {
     const fromOption = document.createElement('option');
-    fromOption.value = currency.code;
-    fromOption.textContent = `${currency.code} - ${currency.name}`;
-    
-    const toOption = document.createElement('option');
-    toOption.value = currency.code;
-    toOption.textContent = `${currency.code} - ${currency.name}`;
-    
+    fromOption.value = code;
+    fromOption.textContent = code;
     fromCurrencySelect.appendChild(fromOption);
+
+    const toOption = document.createElement('option');
+    toOption.value = code;
+    toOption.textContent = code;
     toCurrencySelect.appendChild(toOption);
   });
-  
-  // Set default values
+
+  // Set default selection
   fromCurrencySelect.value = 'USD';
   toCurrencySelect.value = 'EUR';
 }
 
-// Handle currency conversion with simple mock exchange rates
+// Handles the currency conversion process
 async function handleCurrencyConversion() {
   const fromCurrency = document.getElementById('from-currency').value;
   const toCurrency = document.getElementById('to-currency').value;
@@ -83,256 +65,188 @@ async function handleCurrencyConversion() {
   const resultElement = document.getElementById('conversion-result');
   const loadingElement = document.getElementById('conversion-loading');
   const placeholderElement = document.getElementById('conversion-placeholder');
-  
+
+  // Validate input
   if (isNaN(amount) || amount <= 0) {
     showToast('Please enter a valid amount', 'error');
     return;
   }
-  
+
   if (fromCurrency === toCurrency) {
     showToast('Please select different currencies', 'error');
     return;
   }
-  
-  // Hide placeholder and result, show loading
+
+  // Show loading spinner hide previous results
   if (placeholderElement) placeholderElement.style.display = 'none';
   if (resultElement) resultElement.style.display = 'none';
   if (loadingElement) loadingElement.style.display = 'flex';
-  
+
   try {
-    const exchangeRate = await convertCurrency(fromCurrency, toCurrency);
-    if (exchangeRate) {
-      const convertedAmount = amount * exchangeRate;
-      
-      if (resultElement) {
-        resultElement.innerHTML = `
-          <div class="text-2xl font-bold gradient-text mb-2">
-            ${amount.toFixed(2)} ${fromCurrency} = ${convertedAmount.toFixed(2)} ${toCurrency}
-          </div>
-          <div class="text-gray-400 text-sm">
-            1 ${fromCurrency} = ${exchangeRate.toFixed(4)} ${toCurrency}
-          </div>
-          <div class="text-gray-400 text-xs mt-1">
-            Last updated: ${new Date().toLocaleDateString()}
-          </div>
-        `;
-        resultElement.style.display = 'block';
-      }
-      
-      addToConversionHistory(fromCurrency, toCurrency, amount, convertedAmount);
-      showToast('Currency converted successfully');
-    } else {
-      throw new Error('Failed to get exchange rate');
-    }
-    
+    // Fetch conversion rate from the API
+    const response = await fetch(`https://api.frankfurter.app/latest?amount=${amount}&from=${fromCurrency}&to=${toCurrency}`);
+    const data = await response.json();
+    const rate = data.rates[toCurrency];
+    const converted = rate;
+
+    // Show the result
+    resultElement.innerHTML = `
+      <div class="text-2xl font-bold gradient-text mb-2">
+        ${amount.toFixed(2)} ${fromCurrency} = ${converted.toFixed(2)} ${toCurrency}
+      </div>
+      <div class="text-gray-400 text-sm">
+        1 ${fromCurrency} = ${(rate / amount).toFixed(4)} ${toCurrency}
+      </div>
+    `;
+    resultElement.style.display = 'block';
+    loadingElement.style.display = 'none';
+
+    // Save the conversion to history
+    addToConversionHistory(fromCurrency, toCurrency, amount, converted);
+    showToast('Currency converted successfully');
   } catch (error) {
-    console.error('Currency conversion failed:', error);
-    showToast('Failed to get exchange rate. Please try again.', 'error');
-  } finally {
-    if (loadingElement) loadingElement.style.display = 'none';
+    console.error('API error:', error);
+    showToast('Failed to fetch exchange rate', 'error');
+    loadingElement.style.display = 'none';
   }
 }
 
-// Convert currency using Frankfurter API
-async function convertCurrency(from = 'USD', to = 'GBP') {
-  const url = `https://api.frankfurter.app/latest?from=${from}&to=${to}`;
-  try {
-    const res = await fetch(url);
-    const data = await res.json();
-    console.log(`1 ${from} = ${data.rates[to]} ${to}`);
-    return data.rates[to];
-  } catch (err) {
-    console.error('Currency fetch failed:', err);
-    return null;
-  }
-}
-
-// Swap currencies
+// Swaps the selected currencies in the dropdowns
 function swapCurrencies() {
-  const fromCurrencySelect = document.getElementById('from-currency');
-  const toCurrencySelect = document.getElementById('to-currency');
-  
-  if (!fromCurrencySelect || !toCurrencySelect) return;
-  
-  const tempValue = fromCurrencySelect.value;
-  fromCurrencySelect.value = toCurrencySelect.value;
-  toCurrencySelect.value = tempValue;
-  
+  const fromSelect = document.getElementById('from-currency');
+  const toSelect = document.getElementById('to-currency');
+
+  const temp = fromSelect.value;
+  fromSelect.value = toSelect.value;
+  toSelect.value = temp;
+
   showToast('Currencies swapped');
 }
 
-// Load major currency pairs with simple data
+// Loads and displays current rates for major currency pairs
 async function loadMajorCurrencyPairs() {
   const majorPairsElement = document.getElementById('major-pairs');
   if (!majorPairsElement) return;
-  
+
   const pairs = [
-    { from: 'EUR', to: 'USD' },
-    { from: 'USD', to: 'JPY' },
-    { from: 'GBP', to: 'USD' },
-    { from: 'USD', to: 'CHF' },
-    { from: 'USD', to: 'CAD' },
-    { from: 'AUD', to: 'USD' },
-    { from: 'USD', to: 'AED' },
-    { from: 'USD', to: 'INR' }
+    ['EUR', 'USD'],
+    ['USD', 'JPY'],
+    ['GBP', 'USD'],
+    ['USD', 'CHF'],
+    ['USD', 'CAD'],
+    ['AUD', 'USD']
   ];
-  
-  majorPairsElement.innerHTML = '<div class="animate-pulse text-gold-400">Loading exchange rates...</div>';
-  
-  try {
-    const pairPromises = pairs.map(async (pair) => {
-      try {
-        const rate = await convertCurrency(pair.from, pair.to);
-        return rate ? {
-          fromCurrency: pair.from,
-          toCurrency: pair.to,
-          rate: rate
-        } : null;
-      } catch (error) {
-        console.error(`Failed to fetch ${pair.from}/${pair.to}:`, error);
-        return null;
-      }
-    });
-    
-    const results = await Promise.all(pairPromises);
-    const validResults = results.filter(result => result !== null);
-    
-    if (validResults.length > 0) {
-      let pairsHTML = '';
-      validResults.forEach(pair => {
-        pairsHTML += `
-          <div class="glass glass-hover rounded-lg p-4">
-            <div class="flex justify-between items-center">
-              <div class="font-semibold text-gold-400">${pair.fromCurrency}/${pair.toCurrency}</div>
-              <div class="text-lg">${pair.rate.toFixed(4)}</div>
-            </div>
+
+  let html = '';
+
+  // Fetch the rate for each major pair and build HTML content
+  for (const [from, to] of pairs) {
+    try {
+      const res = await fetch(`https://api.frankfurter.app/latest?amount=1&from=${from}&to=${to}`);
+      const data = await res.json();
+      const rate = data.rates[to];
+
+      html += `
+        <div class="glass glass-hover rounded-lg p-4">
+          <div class="flex justify-between items-center">
+            <div class="font-semibold text-gold-400">${from}/${to}</div>
+            <div class="text-lg">${rate.toFixed(4)}</div>
           </div>
-        `;
-      });
-      majorPairsElement.innerHTML = pairsHTML;
-    } else {
-      majorPairsElement.innerHTML = '<div class="text-red-500">Failed to load exchange rates</div>';
+        </div>
+      `;
+    } catch (e) {
+      console.error(`Error loading rate for ${from}/${to}`, e);
     }
-    
-  } catch (error) {
-    console.error('Error loading major pairs:', error);
-    majorPairsElement.innerHTML = '<div class="text-red-500">Failed to load exchange rates</div>';
   }
+
+  majorPairsElement.innerHTML = html;
 }
 
-// Add to conversion history
-function addToConversionHistory(fromCurrency, toCurrency, amount, convertedAmount) {
+// Adds a new item to the conversion history (stored in localStorage)
+function addToConversionHistory(from, to, amount, converted) {
   let history = [];
   try {
     history = JSON.parse(localStorage.getItem('conversionHistory') || '[]');
-  } catch (e) {
-    history = [];
-  }
-  
-  const newConversion = {
-    id: Date.now(),
-    fromCurrency,
-    toCurrency,
+  } catch { }
+
+  // Add new item at the top
+  history.unshift({
+    id: Date.now(), // Unique ID
+    fromCurrency: from,
+    toCurrency: to,
     amount,
-    convertedAmount,
+    convertedAmount: converted,
     timestamp: new Date().toISOString()
-  };
-  
-  history.unshift(newConversion);
-  history = history.slice(0, 5); // Keep only 5 items
-  
-  try {
-    localStorage.setItem('conversionHistory', JSON.stringify(history));
-  } catch (e) {
-    console.warn('Could not save to localStorage');
-  }
-  
-  loadConversionHistory();
+  });
+
+  // Keep only the latest 5 records
+  history = history.slice(0, 5);
+  localStorage.setItem('conversionHistory', JSON.stringify(history));
+
+  loadConversionHistory(); // Refresh the UI
 }
 
-// Load conversion history
+// Loads and displays the saved conversion history
 function loadConversionHistory() {
   const historyElement = document.getElementById('conversion-history');
   if (!historyElement) return;
-  
+
   let history = [];
   try {
     history = JSON.parse(localStorage.getItem('conversionHistory') || '[]');
-  } catch (e) {
-    history = [];
-  }
-  
+  } catch { }
+
   if (history.length === 0) {
     historyElement.innerHTML = '<p class="text-gray-400">No conversion history yet</p>';
     return;
   }
-  
-  let historyHTML = '';
-  history.forEach(item => {
-    const date = new Date(item.timestamp);
-    const formattedDate = date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-    
-    historyHTML += `
+
+  // Display each history item with a delete button
+  historyElement.innerHTML = history.map(item => {
+    const date = new Date(item.timestamp).toLocaleString();
+    return `
       <div class="glass glass-hover rounded-lg p-4 mb-2">
         <div class="flex justify-between items-center">
           <div>
             <div class="font-semibold text-gold-400">
               ${item.amount.toFixed(2)} ${item.fromCurrency} → ${item.convertedAmount.toFixed(2)} ${item.toCurrency}
             </div>
-            <div class="text-sm text-gray-400">${formattedDate}</div>
+            <div class="text-sm text-gray-400">${date}</div>
           </div>
-          <button 
-            class="text-gold-400 hover:text-gold-300 delete-history" 
-            data-id="${item.id}"
-            onclick="deleteConversionHistory(${item.id})"
-          >
-            ✕
-          </button>
+          <button class="text-gold-400 hover:text-gold-300" onclick="deleteConversionHistory(${item.id})">✕</button>
         </div>
       </div>
     `;
-  });
-  
-  historyElement.innerHTML = historyHTML;
+  }).join('');
 }
 
-// Delete conversion history item
+// Deletes a specific item from the conversion history
 function deleteConversionHistory(id) {
   let history = [];
   try {
     history = JSON.parse(localStorage.getItem('conversionHistory') || '[]');
-  } catch (e) {
-    history = [];
-  }
-  
-  history = history.filter(item => item.id !== parseInt(id));
-  
-  try {
-    localStorage.setItem('conversionHistory', JSON.stringify(history));
-  } catch (e) {
-    console.warn('Could not save to localStorage');
-  }
-  
-  loadConversionHistory();
+  } catch { }
+
+  // Remove the item with the matching ID
+  history = history.filter(item => item.id !== id);
+  localStorage.setItem('conversionHistory', JSON.stringify(history));
+
+  loadConversionHistory(); // Refresh history display
   showToast('History item deleted');
 }
 
-// Simple toast notification
+// Shows a temporary notification message (toast)
 function showToast(message, type = 'info') {
   const toast = document.getElementById('toast');
   const toastMessage = document.getElementById('toast-message');
-  
+
   if (!toast || !toastMessage) return;
-  
+
   toastMessage.textContent = message;
   toast.className = `toast ${type === 'error' ? 'error' : 'success'}`;
   toast.style.display = 'block';
-  
+
+  // Hide the toast after 3 seconds
   setTimeout(() => {
     toast.style.display = 'none';
   }, 3000);

@@ -1,359 +1,202 @@
-
-// Dashboard JavaScript - Handles all dashboard functionality with real API data
-// Uses Yahoo Finance for stocks/market data and CoinMarketCap for crypto data
-
-import { 
+// Pulling in all our API helpers (these give us market data, crypto prices, etc.)
+import {
   getMarketIndices,
   getMajorStocks,
-  getMajorCrypto,
-  getGlobalMarketStats,
-  getTrendingStocks,
-  getMarketMovers
+  getMajorCrypto
 } from './api.js';
 
-// Wait for the page to fully load before initializing dashboard
-document.addEventListener('DOMContentLoaded', async function() {
-  console.log('Dashboard loading started...');
-  
-  // Initialize all dashboard sections with proper error handling
-  await initializeMarketOverview();
-  await initializeWatchlist();
-  await initializeCryptoTracker();
-  await initializeGlobalStats();
-  updateDateTime();
-  
-  // Set up refresh button functionality
+// Once the page is fully loaded, run this stuff
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadDashboardData(); // grab all initial data
+  updateDateTime(); // start showing the clock
+
+  // Set up refresh button (if it exists)
   const refreshBtn = document.getElementById('refresh-dashboard');
   if (refreshBtn) {
-    refreshBtn.addEventListener('click', async function() {
-      console.log('User clicked refresh button');
-      this.classList.add('animate-spin');
-      await refreshDashboardData();
+    refreshBtn.addEventListener('click', async () => {
+      refreshBtn.classList.add('animate-spin'); // add spinning animation
+      await loadDashboardData(); // reload everything
       setTimeout(() => {
-        this.classList.remove('animate-spin');
-        showToast('Dashboard data refreshed successfully!');
-      }, 1000);
+        refreshBtn.classList.remove('animate-spin'); // stop the spin
+        showToast('Dashboard data refreshed successfully!'); // show message
+      }, 1000); // delay is just for smoother UI
     });
   }
 });
 
-// Update the current date and time display every second
+// Loads everything: stocks, crypto, and market indices
+async function loadDashboardData() {
+  await Promise.all([
+    renderMarketOverview(),
+    renderWatchlist(),
+    renderCryptoTracker()
+  ]);
+}
+
+// Updates the time every second – useful for a dashboard vibe
 function updateDateTime() {
-  const dateTimeElement = document.getElementById('current-datetime');
-  if (dateTimeElement) {
-    const updateTime = () => {
-      const now = new Date();
-      dateTimeElement.textContent = now.toLocaleString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true
-      });
-    };
-    
-    updateTime(); // Update immediately
-    setInterval(updateTime, 1000); // Then update every second
-  }
-}
+  const el = document.getElementById('current-datetime');
+  if (!el) return; // bail out if the element is missing
 
-// Load and display market indices using Yahoo Finance (^GSPC, ^IXIC, ^DJI, ^RUT)
-async function initializeMarketOverview() {
-  const marketOverviewElement = document.getElementById('market-overview');
-  if (!marketOverviewElement) {
-    console.log('Market overview element not found');
-    return;
-  }
-  
-  try {
-    console.log('Loading market indices data from Yahoo Finance...');
-    marketOverviewElement.innerHTML = '<div class="col-span-full text-center text-gold-400">Loading market data from Yahoo Finance...</div>';
-    
-    // Fetch market indices data from Yahoo Finance API
-    const marketIndices = await getMarketIndices();
-    console.log('Yahoo Finance market indices loaded:', marketIndices);
-    
-    if (!marketIndices || marketIndices.length === 0) {
-      throw new Error('No market indices data received from Yahoo Finance');
-    }
-    
-    let marketOverviewHTML = '';
-    marketIndices.forEach(index => {
-      if (index && index.price) {
-        // Determine if the index is up or down for styling
-        const changeClass = index.change >= 0 ? 'text-neon-green' : 'text-red-500';
-        const changeIcon = index.change >= 0 ? 
-          '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>' : 
-          '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>';
-        
-        // Build HTML for each market index with Yahoo Finance data
-        marketOverviewHTML += `
-          <div class="glass glass-hover rounded-lg p-4">
-            <div class="flex justify-between items-center">
-              <div>
-                <h3 class="font-semibold text-gold-400">${index.symbol}</h3>
-                <span class="text-sm text-gray-400">${index.name || index.symbol}</span>
-              </div>
-              <div class="text-right">
-                <div class="text-xl font-bold">${formatCurrency(index.price, 'USD')}</div>
-                <div class="flex items-center ${changeClass}">
-                  ${changeIcon}
-                  <span class="ml-1">${index.change.toFixed(2)} (${index.changePercent.toFixed(2)}%)</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        `;
-      }
+  const update = () => {
+    el.textContent = new Date().toLocaleString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
     });
-    
-    marketOverviewElement.innerHTML = marketOverviewHTML;
-    console.log('Market overview updated successfully with Yahoo Finance data');
-  } catch (error) {
-    console.error('Error initializing market overview with Yahoo Finance:', error);
-    marketOverviewElement.innerHTML = '<div class="col-span-full text-center text-red-500">Failed to load market data from Yahoo Finance. Checking API connection...</div>';
+  };
+
+  update(); // run once immediately
+  setInterval(update, 1000); // then every second
+}
+
+// Loads market indices and displays them
+async function renderMarketOverview() {
+  const el = document.getElementById('market-overview');
+  if (!el) return;
+  el.innerHTML = loadingSpinner(); // show loading
+
+  try {
+    const data = await getMarketIndices(); // fetch data
+    el.innerHTML = data.map(renderCard).join(''); // render all cards
+  } catch (err) {
+    console.error('Market overview error:', err);
+    el.innerHTML = errorMessage('market data'); // show error message
   }
 }
 
-// Load and display major tech stocks watchlist using Yahoo Finance
-async function initializeWatchlist() {
-  const watchlistElement = document.getElementById('watchlist');
-  if (!watchlistElement) {
-    console.log('Watchlist element not found');
-    return;
-  }
-  
+// Shows top stock list (like a watchlist)
+async function renderWatchlist() {
+  const el = document.getElementById('watchlist');
+  if (!el) return;
+  el.innerHTML = loadingSpinner();
+
   try {
-    console.log('Loading major stocks data from Yahoo Finance...');
-    watchlistElement.innerHTML = '<div class="col-span-full text-center text-gold-400">Loading stock data from Yahoo Finance...</div>';
-    
-    // Fetch major stocks from Yahoo Finance API
-    const stocks = await getMajorStocks();
-    console.log('Yahoo Finance stocks loaded:', stocks);
-    
-    if (!stocks || stocks.length === 0) {
-      throw new Error('No stocks data received from Yahoo Finance');
-    }
-    
-    let watchlistHTML = '';
-    stocks.forEach(stock => {
-      if (stock && stock.price) {
-        // Determine styling based on price movement
-        const changeClass = stock.change >= 0 ? 'text-neon-green' : 'text-red-500';
-        const changeIcon = stock.change >= 0 ? 
-          '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>' : 
-          '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>';
-        
-        // Build HTML for each stock with Yahoo Finance data
-        watchlistHTML += `
-          <div class="glass glass-hover rounded-lg p-4">
-            <div class="flex justify-between items-center">
-              <div>
-                <h3 class="font-semibold text-gold-400">${stock.symbol}</h3>
-                <span class="text-sm text-gray-400">${stock.name}</span>
-              </div>
-              <div class="text-right">
-                <div class="text-xl font-bold">${formatCurrency(stock.price, 'USD')}</div>
-                <div class="flex items-center ${changeClass}">
-                  ${changeIcon}
-                  <span class="ml-1">${stock.change.toFixed(2)} (${stock.changePercent.toFixed(2)}%)</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        `;
-      }
-    });
-    
-    watchlistElement.innerHTML = watchlistHTML;
-    console.log('Watchlist updated successfully with Yahoo Finance data');
-  } catch (error) {
-    console.error('Error initializing watchlist with Yahoo Finance:', error);
-    watchlistElement.innerHTML = '<div class="col-span-full text-center text-red-500">Failed to load stock data from Yahoo Finance. Checking API connection...</div>';
+    const data = await getMajorStocks();
+    el.innerHTML = data.map(renderCard).join('');
+  } catch (err) {
+    console.error('Watchlist error:', err);
+    el.innerHTML = errorMessage('stock data');
   }
 }
 
-// Load and display cryptocurrency data using CoinMarketCap API
-async function initializeCryptoTracker() {
-  const cryptoTrackerElement = document.getElementById('crypto-tracker');
-  if (!cryptoTrackerElement) {
-    console.log('Crypto tracker element not found');
-    return;
-  }
-  
-  try {
-    console.log('Loading cryptocurrency data from CoinMarketCap...');
-    cryptoTrackerElement.innerHTML = '<div class="col-span-full text-center text-gold-400">Loading crypto data from CoinMarketCap...</div>';
-    
-    // Fetch top cryptocurrencies from CoinMarketCap API
-    const cryptos = await getMajorCrypto();
-    console.log('CoinMarketCap cryptocurrencies loaded:', cryptos);
-    
-    if (!cryptos || cryptos.length === 0) {
-      throw new Error('No cryptocurrency data received from CoinMarketCap');
-    }
-    
-    let cryptoHTML = '';
-    cryptos.forEach(crypto => {
-      if (crypto && crypto.price) {
-        // Determine styling based on 24h price change
-        const changeClass = crypto.change >= 0 ? 'text-neon-green' : 'text-red-500';
-        const changeIcon = crypto.change >= 0 ? '▲' : '▼';
-        
-        // Build HTML for each cryptocurrency with CoinMarketCap data
-        cryptoHTML += `
-          <div class="glass glass-hover rounded-lg p-4">
-            <div class="flex justify-between items-center">
-              <div>
-                <h3 class="font-semibold text-gold-400">${crypto.symbol}</h3>
-                <span class="text-sm text-gray-400">${crypto.name}</span>
-              </div>
-              <div class="text-right">
-                <div class="text-xl font-bold">${formatCurrency(crypto.price, 'USD')}</div>
-                <div class="flex items-center ${changeClass}">
-                  <span>${changeIcon} ${crypto.change.toFixed(2)}%</span>
-                </div>
-                <div class="text-sm text-gray-400">Vol: ${formatVolume(crypto.volume)}</div>
-              </div>
-            </div>
-          </div>
-        `;
-      }
-    });
-    
-    cryptoTrackerElement.innerHTML = cryptoHTML;
-    console.log('Crypto tracker updated successfully with CoinMarketCap data');
-  } catch (error) {
-    console.error('Error initializing crypto tracker with CoinMarketCap:', error);
-    cryptoTrackerElement.innerHTML = '<div class="col-span-full text-center text-red-500">Failed to load crypto data from CoinMarketCap. Checking API connection...</div>';
-  }
-}
+// Shows crypto prices — looks a bit different from stock/market cards
+async function renderCryptoTracker() {
+  const el = document.getElementById('crypto-tracker');
+  if (!el) return;
+  el.innerHTML = loadingSpinner();
 
-// Load and display global cryptocurrency market statistics using CoinMarketCap
-async function initializeGlobalStats() {
-  const globalStatsElement = document.getElementById('global-stats');
-  if (!globalStatsElement) {
-    console.log('Global stats element not found');
-    return;
-  }
-  
   try {
-    console.log('Loading global market statistics from CoinMarketCap...');
-    
-    // Fetch global market data from CoinMarketCap
-    const stats = await getGlobalMarketStats();
-    console.log('CoinMarketCap global stats loaded:', stats);
-    
-    if (!stats) {
-      throw new Error('No global stats data received from CoinMarketCap');
-    }
-    
-    // Build HTML for global market statistics with CoinMarketCap data
-    const globalStatsHTML = `
-      <div class="glass rounded-lg p-6">
-        <h3 class="text-lg font-semibold text-gold-400 mb-4">Global Crypto Market Stats</h3>
-        <div class="grid grid-cols-2 gap-4">
+    const data = await getMajorCrypto();
+    el.innerHTML = data.map(crypto => `
+      <div class="glass glass-hover rounded-lg p-4">
+        <div class="flex justify-between items-center">
           <div>
-            <p class="text-gray-400 text-sm">Total Market Cap</p>
-            <p class="text-xl font-bold">${formatCurrency(stats.totalMarketCap, 'USD')}</p>
+            <h3 class="font-semibold text-gold-400">${crypto.symbol}</h3>
+            <span class="text-sm text-gray-400">${crypto.name}</span>
           </div>
-          <div>
-            <p class="text-gray-400 text-sm">24h Volume</p>
-            <p class="text-xl font-bold">${formatVolume(stats.totalVolume)}</p>
-          </div>
-          <div>
-            <p class="text-gray-400 text-sm">BTC Dominance</p>
-            <p class="text-xl font-bold">${stats.btcDominance.toFixed(1)}%</p>
-          </div>
-          <div>
-            <p class="text-gray-400 text-sm">Active Cryptos</p>
-            <p class="text-xl font-bold">${stats.activeCryptocurrencies.toLocaleString()}</p>
+          <div class="text-right">
+            <div class="text-xl font-bold">${formatCurrency(crypto.price)}</div>
+            <div class="text-sm text-gray-400">Vol: ${formatVolume(crypto.volume)}</div>
           </div>
         </div>
       </div>
-    `;
-    
-    globalStatsElement.innerHTML = globalStatsHTML;
-    console.log('Global stats updated successfully with CoinMarketCap data');
-  } catch (error) {
-    console.error('Error loading global stats from CoinMarketCap:', error);
-    globalStatsElement.innerHTML = '<div class="text-red-500">Failed to load global market stats from CoinMarketCap. Checking API connection...</div>';
+    `).join('');
+  } catch (err) {
+    console.error('Crypto tracker error:', err);
+    el.innerHTML = errorMessage('crypto data');
   }
 }
 
-// Refresh all dashboard data when user clicks refresh button
-async function refreshDashboardData() {
-  try {
-    console.log('Refreshing all dashboard data...');
-    
-    // Refresh all sections with Yahoo Finance and CoinMarketCap data
-    await initializeMarketOverview();
-    await initializeWatchlist();
-    await initializeCryptoTracker();
-    await initializeGlobalStats();
-    
-    console.log('Dashboard refresh completed successfully');
-    return true;
-  } catch (error) {
-    console.error('Error refreshing dashboard data:', error);
-    showToast('Failed to refresh dashboard data. Please try again.', 'error');
-    return false;
-  }
+// Creates a card 
+
+function renderCard(item) {
+  const isUp = item.change >= 0;
+  const icon = isUp
+    ? `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7 7 7M12 3v18"/>
+       </svg>`
+    : `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7-7-7M12 21V3"/>
+       </svg>`;
+
+  return `
+    <div class="glass glass-hover rounded-lg p-4">
+      <div class="flex justify-between items-center">
+        <div>
+          <h3 class="font-semibold text-gold-400">${item.symbol}</h3>
+          <span class="text-sm text-gray-400">${new Date().toISOString().split('T')[0]}</span>
+        </div>
+        <div class="text-right">
+          <div class="text-xl font-bold">${formatCurrency(item.price)}</div>
+          <div class="flex items-center ${isUp ? 'text-neon-green' : 'text-red-500'}">
+            ${icon}
+            <span class="ml-1">${Math.abs(item.change).toFixed(2)} (${Math.abs(item.changesPercentage || item.changePercent || 0).toFixed(2)}%)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
-// Format numbers as currency (e.g., $1,234.56)
+// Basic spinner for loading states 
+function loadingSpinner() {
+  return `
+    <div class="flex justify-center items-center py-6">
+      <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gold-500"></div>
+    </div>
+  `;
+}
+
+// Shows a reusable error block when data fails to load
+function errorMessage(type) {
+  return `
+    <div class="text-center text-red-500">
+      Failed to load ${type}. <br/>
+      <button onclick="location.reload()" class="mt-2 text-gold-400 hover:text-gold-300 underline">
+        Try Again
+      </button>
+    </div>
+  `;
+}
+
+// Converts numbers to $ format 
 function formatCurrency(amount, currency = 'USD') {
-  if (!amount || isNaN(amount)) return '$0.00';
-  
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: currency,
+    currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(amount);
 }
 
-// Format large numbers with K, M, B, T suffixes for volume display
-function formatVolume(volume) {
-  if (!volume || isNaN(volume)) return '$0';
-  
-  if (volume >= 1e12) {
-    return '$' + (volume / 1e12).toFixed(1) + 'T'; // Trillions
-  } else if (volume >= 1e9) {
-    return '$' + (volume / 1e9).toFixed(1) + 'B'; // Billions
-  } else if (volume >= 1e6) {
-    return '$' + (volume / 1e6).toFixed(1) + 'M'; // Millions
-  } else if (volume >= 1e3) {
-    return '$' + (volume / 1e3).toFixed(1) + 'K'; // Thousands
-  } else {
-    return '$' + volume.toFixed(0);
-  }
+// Takes a big volume number and shortens it
+function formatVolume(vol) {
+  if (vol >= 1e12) return (vol / 1e12).toFixed(1) + 'T';
+  if (vol >= 1e9) return (vol / 1e9).toFixed(1) + 'B';
+  if (vol >= 1e6) return (vol / 1e6).toFixed(1) + 'M';
+  if (vol >= 1e3) return (vol / 1e3).toFixed(1) + 'K';
+  return vol.toLocaleString(); // fallback
 }
 
-// Show toast notification to user (success or error messages)
+// Little toast notification at the bottom 
 function showToast(message, type = 'success') {
   const toast = document.getElementById('toast');
-  const toastMessage = document.getElementById('toast-message');
-  
-  if (toast && toastMessage) {
-    toastMessage.textContent = message;
-    toast.classList.add('show');
-    
-    // Style toast based on message type
-    if (type === 'error') {
-      toast.style.borderColor = 'rgba(239, 68, 68, 0.3)'; // Red border for errors
-      toast.style.color = '#ef4444'; // Red text for errors
-    } else {
-      toast.style.borderColor = 'rgba(245, 158, 11, 0.3)'; // Gold border for success
-      toast.style.color = '#f59e0b'; // Gold text for success
-    }
-    
-    // Hide toast after 3 seconds
-    setTimeout(() => {
-      toast.classList.remove('show');
-    }, 3000);
-  }
+  const messageBox = document.getElementById('toast-message');
+  if (!toast || !messageBox) return;
+
+  messageBox.textContent = message;
+  toast.classList.add('show');
+
+  toast.style.color = type === 'error' ? '#ef4444' : '#f59e0b';
+  toast.style.borderColor = type === 'error' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(245, 158, 11, 0.3)';
+
+  setTimeout(() => {
+    toast.classList.remove('show');
+  }, 3000); // hide after 3 secs
 }
